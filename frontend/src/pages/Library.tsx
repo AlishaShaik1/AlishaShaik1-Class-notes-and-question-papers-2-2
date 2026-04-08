@@ -1,5 +1,5 @@
 // frontend/src/pages/Library.tsx
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { motion } from 'framer-motion';
@@ -41,9 +41,9 @@ const Library: React.FC = () => {
 
     // Department-specific subjects
     const SUBJECTS_MAP: Record<string, string[]> = {
-        AIML: ['M4', 'DLCO', 'ML', 'DBMS', 'OT', 'ES'],
-        CSE:  ['M4', 'MEFA', 'OS', 'DBMS', 'SE'],
-        DS:   ['SMDS', 'COA', 'DE', 'DBMS', 'OT', 'ES'],
+        AIML: ['M4', 'DLCO', 'ML', 'DBMS', 'OT', 'DTI'],
+        CSE:  ['M4', 'MEFA', 'OS', 'DBMS', 'SE', 'DTI'],
+        DS:   ['SMDS', 'COA', 'DE', 'DBMS', 'OT', 'DTI'],
     };
     const SUBJECTS = SUBJECTS_MAP[deptName] || SUBJECTS_MAP['AIML'];
 
@@ -63,6 +63,27 @@ const Library: React.FC = () => {
         };
         if (deptName) fetchNotes();
     }, [deptName]);
+
+    // Push a history entry when a subject is selected so mobile back button works
+    const selectSubject = useCallback((subject: string | null) => {
+        if (subject) {
+            window.history.pushState({ subject }, '');
+        }
+        setSelectedSubject(subject);
+    }, []);
+
+    // Listen for mobile back button
+    useEffect(() => {
+        const handlePopState = (e: PopStateEvent) => {
+            // If we had a subject selected, clear it instead of leaving the page
+            if (selectedSubject) {
+                setSelectedSubject(null);
+                // Prevent default navigation — we already handled it
+            }
+        };
+        window.addEventListener('popstate', handlePopState);
+        return () => window.removeEventListener('popstate', handlePopState);
+    }, [selectedSubject]);
 
     const filteredNotes = useMemo(() => {
         let notes = allNotes.filter(note => note.fileType === filterType);
@@ -254,7 +275,7 @@ const Library: React.FC = () => {
                     {SUBJECTS.map(subject => (
                         <motion.button
                             key={subject}
-                            onClick={() => setSelectedSubject(subject)}
+                            onClick={() => selectSubject(subject)}
                             className="flex flex-col items-center p-4 sm:p-6 bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 border-b-4 border-pec-yellow"
                             whileHover={{ scale: 1.03 }}
                             whileTap={{ scale: 0.98 }}
@@ -275,7 +296,7 @@ const Library: React.FC = () => {
                     {selectedSubject && (
                         <div className="flex justify-between items-center mb-6">
                             <motion.button
-                                onClick={() => setSelectedSubject(null)}
+                                onClick={() => window.history.back()}
                                 className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded-lg shadow-md hover:bg-gray-300 transition duration-200"
                                 whileHover={{ scale: 1.05 }}
                             >

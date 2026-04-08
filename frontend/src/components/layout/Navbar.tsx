@@ -29,13 +29,13 @@ const Navbar: React.FC = () => {
           <div className="relative flex items-center justify-between h-16 md:h-20">
             {/* Left: Logo */}
             <Link to={deptKey ? `/${deptKey}/library` : '/'} className="flex-shrink-0 z-10">
-              <motion.img src="https://tse1.mm.bing.net/th/id/OIP.v3GbNXGV_rYeOcVEXSL1IQHaCw?rs=1&pid=ImgDetMain&o=7&rm=3" alt="Logo" className="h-8 md:h-12 w-auto object-contain drop-shadow-md" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: 'easeOut' }} whileHover={{ scale: 1.05 }} />
+              <motion.img src="https://tse1.mm.bing.net/th/id/OIP.v3GbNXGV_rYeOcVEXSL1IQHaCw?rs=1&pid=ImgDetMain&o=7&rm=3" alt="Logo" className="h-8 md:h-12 w-auto object-contain drop-shadow-md rounded-md" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: 'easeOut' }} whileHover={{ scale: 1.05 }} />
             </Link>
 
             {/* Center: Title */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none pr-20 md:pr-0">
+            <div className={`absolute inset-0 flex items-center justify-center pointer-events-none ${isHome ? '' : 'pr-16'} md:pr-0`}>
               {/* Mobile: short title */}
-              <motion.span className="md:hidden text-white font-extrabold tracking-wide uppercase drop-shadow-lg text-[11px] sm:text-xs whitespace-nowrap pointer-events-auto" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
+              <motion.span className={`md:hidden text-white font-extrabold tracking-wide uppercase drop-shadow-lg whitespace-nowrap pointer-events-auto ${isHome ? 'text-sm sm:text-base tracking-wider' : 'text-[11px] sm:text-xs'}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
                 {shortTitle}
               </motion.span>
               {/* Desktop: full title */}

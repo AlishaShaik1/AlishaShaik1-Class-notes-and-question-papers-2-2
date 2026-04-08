@@ -50,5 +50,32 @@ router.get('/analytics', adminAuth, async (req, res) => {
     }
 });
 
+// PUT /api/admin/notes/:id — Update note details (admin only)
+router.put('/notes/:id', adminAuth, async (req, res) => {
+    try {
+        const { title, uploaderName, createdAt } = req.body;
+        const updateData = {};
+        
+        if (title) updateData.title = title;
+        if (uploaderName) updateData.uploaderName = uploaderName;
+        if (createdAt) updateData.createdAt = new Date(createdAt);
+
+        const updatedNote = await Note.findByIdAndUpdate(
+            req.params.id,
+            { $set: updateData },
+            { new: true }
+        );
+
+        if (!updatedNote) {
+            return res.status(404).json({ message: 'Note not found' });
+        }
+
+        res.json({ message: 'Note updated successfully', note: updatedNote });
+    } catch (error) {
+        console.error('Edit note error:', error);
+        res.status(500).json({ message: 'Failed to update note details' });
+    }
+});
+
 export default router;
 

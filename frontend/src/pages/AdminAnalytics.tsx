@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
-import { Trash2, Download, Eye, ArrowLeft } from 'lucide-react';
+import { Trash2, Download, Eye, ArrowLeft, Edit, X } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -38,6 +38,8 @@ const AdminAnalytics: React.FC = () => {
     const [filterType, setFilterType] = useState('All');
     const [searchTerm, setSearchTerm] = useState('');
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+    const [editingNote, setEditingNote] = useState<Note | null>(null);
+    const [editFormData, setEditFormData] = useState({ title: '', uploaderName: '', createdAt: '' });
 
     useEffect(() => {
         fetchAnalytics();
@@ -73,6 +75,22 @@ const AdminAnalytics: React.FC = () => {
             }
         } catch {
             alert('Failed to delete. Check console.');
+        }
+    };
+
+    const handleEditSave = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingNote) return;
+        try {
+            const token = localStorage.getItem('adminToken');
+            const res = await axios.put(`${API_BASE_URL}/api/admin/notes/${editingNote._id}`, editFormData, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            // Update the state locally to avoid needing a refresh
+            setNotes(prev => prev.map(n => n._id === editingNote._id ? { ...n, ...res.data.note } : n));
+            setEditingNote(null);
+        } catch {
+            alert('Failed to update note. Check console.');
         }
     };
 
@@ -250,7 +268,7 @@ const AdminAnalytics: React.FC = () => {
                                             {formatDate(note.createdAt)}
                                         </td>
                                         <td className="px-4 py-3">
-                                            <div className="flex items-center justify-center gap-1">
+                                            <div className="flex items-center gap-1 flex-wrap">
                                                 <motion.button
                                                     whileHover={{ scale: 1.1 }}
                                                     whileTap={{ scale: 0.9 }}
@@ -270,6 +288,23 @@ const AdminAnalytics: React.FC = () => {
                                                 >
                                                     <Download className="w-4 h-4" />
                                                 </motion.a>
+
+                                                <motion.button
+                                                    whileHover={{ scale: 1.1 }}
+                                                    whileTap={{ scale: 0.9 }}
+                                                    onClick={() => {
+                                                        setEditingNote(note);
+                                                        setEditFormData({
+                                                            title: note.title,
+                                                            uploaderName: note.uploaderName,
+                                                            createdAt: new Date(note.createdAt).toISOString().slice(0, 16)
+                                                        });
+                                                    }}
+                                                    className="p-1.5 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition"
+                                                    title="Edit Details"
+                                                >
+                                                    <Edit className="w-4 h-4" />
+                                                </motion.button>
 
                                                 {/* Delete with confirmation */}
                                                 {deleteConfirm === note._id ? (
@@ -314,6 +349,80 @@ const AdminAnalytics: React.FC = () => {
                     </div>
                 )}
             </motion.div>
+
+            {/* Edit Modal */}
+            <AnimatePresence>
+                {editingNote && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9 }}
+                            animate={{ scale: 1 }}
+                            exit={{ scale: 0.9 }}
+                            className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md relative"
+                        >
+                            <button
+                                onClick={() => setEditingNote(null)}
+                                className="absolute top-4 right-4 text-gray-500 hover:text-gray-900"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                            <h2 className="text-xl font-bold text-pec-blue mb-4">Edit Note Details</h2>
+                            <form onSubmit={handleEditSave} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Title</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={editFormData.title}
+                                        onChange={e => setEditFormData({ ...editFormData, title: e.target.value })}
+                                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pec-blue"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Uploader Name</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={editFormData.uploaderName}
+                                        onChange={e => setEditFormData({ ...editFormData, uploaderName: e.target.value })}
+                                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pec-blue"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Upload Date</label>
+                                    <input
+                                        type="datetime-local"
+                                        required
+                                        value={editFormData.createdAt}
+                                        onChange={e => setEditFormData({ ...editFormData, createdAt: e.target.value })}
+                                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-pec-blue"
+                                    />
+                                </div>
+                                <div className="pt-2 flex justify-end gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditingNote(null)}
+                                        className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg font-bold hover:bg-gray-300 transition"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="px-4 py-2 bg-pec-green text-white rounded-lg font-bold hover:bg-green-600 transition shadow-md"
+                                    >
+                                        Save Changes
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };
