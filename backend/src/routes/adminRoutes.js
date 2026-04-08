@@ -58,7 +58,13 @@ router.put('/notes/:id', adminAuth, async (req, res) => {
         
         if (title) updateData.title = title;
         if (uploaderName) updateData.uploaderName = uploaderName;
-        if (createdAt) updateData.createdAt = new Date(createdAt);
+        if (createdAt) {
+            const parsedDate = new Date(createdAt);
+            if (isNaN(parsedDate.getTime())) {
+                return res.status(400).json({ message: 'Invalid createdAt date format' });
+            }
+            updateData.createdAt = parsedDate;
+        }
 
         const updatedNote = await Note.findByIdAndUpdate(
             req.params.id,
@@ -73,6 +79,9 @@ router.put('/notes/:id', adminAuth, async (req, res) => {
         res.json({ message: 'Note updated successfully', note: updatedNote });
     } catch (error) {
         console.error('Edit note error:', error);
+        if (error.name === 'CastError') {
+            return res.status(400).json({ message: 'Invalid note ID format' });
+        }
         res.status(500).json({ message: 'Failed to update note details' });
     }
 });

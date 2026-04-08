@@ -100,6 +100,12 @@ const AdminAnalytics: React.FC = () => {
             hour: '2-digit', minute: '2-digit',
         });
 
+    const getLocalDatetimeString = (d: string) => {
+        const date = new Date(d);
+        const pad = (n: number) => n.toString().padStart(2, '0');
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    };
+
     const filteredNotes = notes.filter(n => {
         const matchDept = filterDept === 'All' || n.department === filterDept;
         const matchType = filterType === 'All' || n.fileType === filterType;
@@ -297,7 +303,7 @@ const AdminAnalytics: React.FC = () => {
                                                         setEditFormData({
                                                             title: note.title,
                                                             uploaderName: note.uploaderName,
-                                                            createdAt: new Date(note.createdAt).toISOString().slice(0, 16)
+                                                            createdAt: getLocalDatetimeString(note.createdAt)
                                                         });
                                                     }}
                                                     className="p-1.5 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition"

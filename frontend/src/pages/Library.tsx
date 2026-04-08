@@ -75,15 +75,12 @@ const Library: React.FC = () => {
     // Listen for mobile back button
     useEffect(() => {
         const handlePopState = (e: PopStateEvent) => {
-            // If we had a subject selected, clear it instead of leaving the page
-            if (selectedSubject) {
-                setSelectedSubject(null);
-                // Prevent default navigation — we already handled it
-            }
+            // Restore the subject from history state
+            setSelectedSubject(e.state?.subject || null);
         };
         window.addEventListener('popstate', handlePopState);
         return () => window.removeEventListener('popstate', handlePopState);
-    }, [selectedSubject]);
+    }, []);
 
     const filteredNotes = useMemo(() => {
         let notes = allNotes.filter(note => note.fileType === filterType);
