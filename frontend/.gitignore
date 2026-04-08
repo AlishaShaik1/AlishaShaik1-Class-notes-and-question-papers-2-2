@@ -1,0 +1,73 @@
+# ----------------------------------
+# A. DEPENDENCIES & ENVIRONMENT (CRITICAL)
+# ----------------------------------
+# Ignore all local node dependency folders
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+# General package manager lock files and dependency caches
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# NEVER commit your secrets, API keys, or database URLs
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+**/.env* # Covers all nested .env files
+.node_repl_history
+
+# ----------------------------------
+# B. BUILD ARTIFACTS & OUTPUTS
+# ----------------------------------
+# Vite build output (Production Frontend build)
+/dist/
+/dist-ssr/
+/frontend/dist/ 
+
+# Common compilation/artifact directories
+/build
+/tmp
+/out
+.cache/
+
+# Vite temporary/log files
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# ----------------------------------
+# C. LOGS, CACHE, and COVERAGE
+# ----------------------------------
+logs/
+*.log
+coverage/
+.nyc_output/
+.parcel-cache
+.npm
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+# Optional cache files
+.eslintcache
+.stylelintcache
+
+# ----------------------------------
+# D. IDE and OS Files
+# ----------------------------------
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
