@@ -1,5 +1,6 @@
 // frontend/src/App.tsx
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Analytics } from '@vercel/analytics/react';
 import { AdminProvider } from './contexts/AdminContext';
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
@@ -25,6 +26,7 @@ function App() {
   return (
     <AdminProvider>
       <Router>
+        <Analytics />
         <Routes>
           {/* Home page — department selection (no navbar needed, it has its own layout) */}
           <Route path="/" element={
