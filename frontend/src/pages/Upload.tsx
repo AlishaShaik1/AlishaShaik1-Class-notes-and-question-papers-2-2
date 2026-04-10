@@ -1,6 +1,6 @@
 // frontend/src/pages/Upload.tsx
 import React, { useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { AnimatePresence } from "framer-motion"; 
 import FileUploadForm from "../components/notes/FileUploadForm";
@@ -15,8 +15,13 @@ const DEPT_NAMES: Record<string, string> = {
 
 const Upload: React.FC = () => {
   const { department } = useParams<{ department: string }>();
+  const [searchParams] = useSearchParams();
   const deptKey = department?.toLowerCase() || '';
   const deptName = DEPT_NAMES[deptKey] || deptKey.toUpperCase();
+
+  // Read pre-fill values from query params
+  const defaultFileType = searchParams.get('fileType') || '';
+  const defaultSubject = searchParams.get('subject') || '';
 
   const [isWarningVisible, setIsWarningVisible] = useState(true);
 
@@ -99,7 +104,11 @@ const Upload: React.FC = () => {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.6, duration: 0.6 }}
         >
-          <FileUploadForm department={deptName} />
+          <FileUploadForm
+            department={deptName}
+            defaultFileType={defaultFileType}
+            defaultSubject={defaultSubject}
+          />
         </motion.div>
       </motion.div>
 

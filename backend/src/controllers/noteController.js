@@ -1,7 +1,21 @@
 // backend/src/controllers/noteController.js
 
+import crypto from 'crypto';
 import Note from '../models/Note.js';
 import supabase, { BUCKET_NAME } from '../config/supabase.js';
+
+// Generate a random token and its hash
+const generateToken = () => {
+    const token = crypto.randomBytes(24).toString('hex'); // 48-char token
+    const hash = crypto.createHash('sha256').update(token).digest('hex');
+    return { token, hash };
+};
+
+// Verify a token against a stored hash
+const verifyToken = (token, hash) => {
+    const inputHash = crypto.createHash('sha256').update(token).digest('hex');
+    return inputHash === hash;
+};
 
 // -----------------------------------------------------------------------
 // @desc    Upload a new PDF note
@@ -52,6 +66,9 @@ export const uploadNote = async (req, res) => {
     }
 
     try {
+        // Generate upload token for the uploader
+        const { token, hash } = generateToken();
+
         const note = new Note({
             title,
             subject: finalSubject,
@@ -61,11 +78,17 @@ export const uploadNote = async (req, res) => {
             fileType, 
             chapter: chapterNum,
             department,
-            uploaderName: uploaderName || 'Anonymous', 
+            uploaderName: uploaderName || 'Anonymous',
+            uploadToken: hash, // Store only the hash
         });
 
         const createdNote = await note.save();
-        res.status(201).json(createdNote);
+
+        // Return the note + the raw token (user saves this in localStorage)
+        res.status(201).json({
+            ...createdNote.toObject(),
+            uploadToken: token, // Send raw token back (NOT the hash)
+        });
 
     } catch (error) {
         console.error('Database save error:', error.message);
@@ -86,7 +109,8 @@ export const getNotes = async (req, res) => {
             filter.department = req.query.department.toUpperCase();
         }
 
-        const notes = await Note.find(filter).sort({ createdAt: -1 });
+        // Exclude uploadToken hash from public responses
+        const notes = await Note.find(filter).select('-uploadToken').sort({ createdAt: -1 });
         res.json(notes);
     } catch (error) {
         res.status(500).json({ message: 'Failed to fetch notes.', error: error.message });
@@ -112,15 +136,59 @@ export const downloadNote = async (req, res) => {
 };
 
 // -----------------------------------------------------------------------
+// @desc    Edit note metadata (title, subject, chapter, fileType, department)
+// @route   PUT /api/notes/:id
+// @access  Uploader (via token) or Admin (via JWT)
+export const editNote = async (req, res) => {
+    try {
+        const note = await Note.findById(req.params.id);
+
+        if (!note) {
+            return res.status(404).json({ message: 'Note not found.' });
+        }
+
+        // Authorization: check upload token OR admin JWT
+        const uploadToken = req.headers['x-upload-token'];
+        const isAdmin = req.isAdmin === true;
+
+        if (!isAdmin && (!uploadToken || !verifyToken(uploadToken, note.uploadToken))) {
+            return res.status(403).json({ message: 'You are not authorized to edit this note.' });
+        }
+
+        // Update allowed fields
+        const { title, subject, chapter, fileType, department } = req.body;
+        if (title) note.title = title;
+        if (subject) note.subject = subject;
+        if (chapter !== undefined) note.chapter = parseInt(chapter, 10);
+        if (fileType) note.fileType = fileType;
+        if (department) note.department = department;
+
+        const updatedNote = await note.save();
+        res.json(updatedNote);
+
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to update note.', error: error.message });
+    }
+};
+
+// -----------------------------------------------------------------------
 // @desc    Delete a note by ID (also removes file from Supabase)
 // @route   DELETE /api/notes/:id
-// @access  Admin Only
+// @access  Uploader (via token) or Admin (via JWT)
 export const deleteNote = async (req, res) => {
     try {
         const note = await Note.findById(req.params.id);
 
         if (!note) {
             return res.status(404).json({ message: 'Note not found in database.' });
+        }
+
+        // Authorization: check upload token OR admin JWT
+        const uploadToken = req.headers['x-upload-token'];
+        const isAdmin = req.isAdmin === true;
+
+        if (!isAdmin && (!uploadToken || !verifyToken(uploadToken, note.uploadToken))) {
+            return res.status(403).json({ message: 'You are not authorized to delete this note.' });
         }
 
         // Delete from Supabase storage if path exists

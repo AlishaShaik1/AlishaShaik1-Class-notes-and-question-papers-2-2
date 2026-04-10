@@ -49,6 +49,11 @@ const noteSchema = mongoose.Schema(
             default: 'Anonymous',
             maxlength: 50,
         },
+        // Hashed token for uploader to edit/delete without login
+        uploadToken: {
+            type: String,
+            default: '',
+        },
     },
     {
         timestamps: true,

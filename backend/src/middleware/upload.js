@@ -3,9 +3,19 @@
 
 import multer from 'multer';
 import supabase, { BUCKET_NAME } from '../config/supabase.js';
+import fs from 'fs';
+import os from 'os';
 
-// 1. Use memory storage — file buffer stays in RAM, then we push to Supabase
-const storage = multer.memoryStorage();
+// 1. Use disk storage — reduces memory usage for large files
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, os.tmpdir());
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+        cb(null, file.fieldname + '-' + uniqueSuffix + '.pdf');
+    }
+});
 
 // 2. File Filter (Only PDFs allowed)
 const pdfFilter = (req, file, cb) => {
@@ -22,7 +32,7 @@ const upload = multer({
     storage: storage,
     fileFilter: pdfFilter,
     limits: {
-        fileSize: 1024 * 1024 * 50 // 50 MB limit (compression middleware handles files > 10 MB)
+        fileSize: 1024 * 1024 * 50 // 50 MB total upload limit (compression middleware explicitly handles files > 10 MB)
     }
 });
 
@@ -43,10 +53,12 @@ export const uploadToSupabase = async (req, res, next) => {
 
         console.log(`Uploading to Supabase: ${filePath}`);
 
+        const fileData = fs.readFileSync(req.file.path);
+
         const { data, error } = await supabase
             .storage
             .from(BUCKET_NAME)
-            .upload(filePath, req.file.buffer, {
+            .upload(filePath, fileData, {
                 contentType: req.file.mimetype,
                 upsert: false,
             });
@@ -78,5 +90,13 @@ export const uploadToSupabase = async (req, res, next) => {
             message: 'Upload failed: Server error during file processing.',
             detail: err.message,
         });
+    } finally {
+        if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+            try {
+                fs.unlinkSync(req.file.path);
+            } catch (cleanupErr) {
+                console.error('Error cleaning up temp file:', cleanupErr.message);
+            }
+        }
     }
 };

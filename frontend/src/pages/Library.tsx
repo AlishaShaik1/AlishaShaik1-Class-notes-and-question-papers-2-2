@@ -1,6 +1,6 @@
 // frontend/src/pages/Library.tsx
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import { motion } from 'framer-motion';
 import NoteCard from '../components/notes/NoteCard';
@@ -164,7 +164,11 @@ const Library: React.FC = () => {
             >
                 {filteredNotes.map(note => (
                     <motion.div key={note._id} variants={itemVariants}>
-                        <NoteCard note={note} onDelete={(id) => setAllNotes(prev => prev.filter(n => n._id !== id))} />
+                        <NoteCard
+                            note={note}
+                            onDelete={(id) => setAllNotes(prev => prev.filter(n => n._id !== id))}
+                            onEdit={(id, updated) => setAllNotes(prev => prev.map(n => n._id === id ? { ...n, ...updated } : n))}
+                        />
                     </motion.div>
                 ))}
             </motion.div>
@@ -284,6 +288,23 @@ const Library: React.FC = () => {
                             <span className="text-sm text-gray-500">View {filterType}</span>
                         </motion.button>
                     ))}
+
+                    {/* Upload Card */}
+                    <motion.div
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.98 }}
+                    >
+                        <Link
+                            to={`/${deptKey}/upload?fileType=${filterType}`}
+                            className="flex flex-col items-center justify-center p-4 sm:p-6 bg-gradient-to-br from-pec-green/10 to-pec-blue/10 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-dashed border-pec-green h-full"
+                        >
+                            <span className="text-4xl sm:text-5xl mb-2">📤</span>
+                            <span className="text-base sm:text-lg font-bold text-pec-green">
+                                Upload {filterType}
+                            </span>
+                            <span className="text-xs text-gray-500 text-center mt-1">Share with classmates</span>
+                        </Link>
+                    </motion.div>
                 </motion.div>
             )}
 
@@ -291,20 +312,73 @@ const Library: React.FC = () => {
             {showList && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                     {selectedSubject && (
-                        <div className="flex justify-between items-center mb-6">
-                            <motion.button
-                                onClick={() => window.history.back()}
-                                className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded-lg shadow-md hover:bg-gray-300 transition duration-200"
-                                whileHover={{ scale: 1.05 }}
+                        <>
+                            <div className="flex justify-between items-center mb-6">
+                                <motion.button
+                                    onClick={() => window.history.back()}
+                                    className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded-lg shadow-md hover:bg-gray-300 transition duration-200"
+                                    whileHover={{ scale: 1.05 }}
+                                >
+                                    ← Back to Subjects
+                                </motion.button>
+                                <h2 className="text-xl sm:text-2xl font-bold text-pec-blue hidden sm:block">
+                                    {selectedSubject} {filterType} List
+                                </h2>
+                                <div></div>
+                            </div>
+
+                            {/* Upload Banner Card */}
+                            <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.3 }}
+                                className="mb-6"
                             >
-                                ← Back to Subjects
-                            </motion.button>
-                            <h2 className="text-xl sm:text-2xl font-bold text-pec-blue hidden sm:block">
-                                {selectedSubject} {filterType} List
-                            </h2>
-                            <div></div>
-                        </div>
+                                <Link
+                                    to={`/${deptKey}/upload?fileType=${filterType}&subject=${selectedSubject}`}
+                                    className="flex items-center gap-4 p-4 sm:p-5 bg-gradient-to-r from-pec-green/10 via-white to-pec-blue/10 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-dashed border-pec-green group"
+                                >
+                                    <span className="text-4xl sm:text-5xl group-hover:scale-110 transition-transform duration-300">📤</span>
+                                    <div className="flex-1">
+                                        <span className="text-lg sm:text-xl font-bold text-pec-green group-hover:text-pec-blue transition-colors">
+                                            Upload {selectedSubject} {filterType}
+                                        </span>
+                                        <p className="text-sm text-gray-500 mt-0.5">
+                                            Share your {filterType.toLowerCase()} with classmates — files over 10 MB are auto-compressed
+                                        </p>
+                                    </div>
+                                    <span className="text-pec-green group-hover:text-pec-blue text-2xl transition-colors">→</span>
+                                </Link>
+                            </motion.div>
+                        </>
                     )}
+
+                    {/* Upload banner for Papers (no folder view) */}
+                    {filterType === 'Papers' && !selectedSubject && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.3 }}
+                            className="mb-6"
+                        >
+                            <Link
+                                to={`/${deptKey}/upload?fileType=Papers`}
+                                className="flex items-center gap-4 p-4 sm:p-5 bg-gradient-to-r from-pec-green/10 via-white to-pec-blue/10 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 border-2 border-dashed border-pec-green group"
+                            >
+                                <span className="text-4xl sm:text-5xl group-hover:scale-110 transition-transform duration-300">📤</span>
+                                <div className="flex-1">
+                                    <span className="text-lg sm:text-xl font-bold text-pec-green group-hover:text-pec-blue transition-colors">
+                                        Upload Exam Papers
+                                    </span>
+                                    <p className="text-sm text-gray-500 mt-0.5">
+                                        Share previous year papers with classmates — files over 10 MB are auto-compressed
+                                    </p>
+                                </div>
+                                <span className="text-pec-green group-hover:text-pec-blue text-2xl transition-colors">→</span>
+                            </Link>
+                        </motion.div>
+                    )}
+
                     {renderContent()}
                 </motion.div>
             )}

@@ -8,16 +8,18 @@ const API_URL = `${API_BASE_URL}/api/notes`;
 
 interface FileUploadFormProps {
     department: string; // e.g., 'AIML', 'CSE', 'DS', 'AI'
+    defaultFileType?: string; // Pre-filled from Library (Notes, Assignments, Papers)
+    defaultSubject?: string;  // Pre-filled from Library (e.g., ML, DBMS)
 }
 
-const FileUploadForm: React.FC<FileUploadFormProps> = ({ department }) => {
+const FileUploadForm: React.FC<FileUploadFormProps> = ({ department, defaultFileType = '', defaultSubject = '' }) => {
     const [file, setFile] = useState<File | null>(null);
     const [title, setTitle] = useState('');
-    const [subject, setSubject] = useState('');
+    const [subject, setSubject] = useState(defaultSubject);
     const [chapter, setChapter] = useState('');
-    const [courseYear, setCourseYear] = useState('');
+    const [courseYear, setCourseYear] = useState('2026');
     const [uploaderName, setUploaderName] = useState('');
-    const [fileType, setFileType] = useState('');
+    const [fileType, setFileType] = useState(defaultFileType);
     const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' | '' }>({ text: '', type: '' });
     const [loading, setLoading] = useState(false);
 
@@ -53,8 +55,8 @@ const FileUploadForm: React.FC<FileUploadFormProps> = ({ department }) => {
             setMessage({ text: 'Only PDF files are allowed.', type: 'error' });
             return;
         }
-        if (file.size > 11 * 1024 * 1024) {
-            setMessage({ text: 'Please upload below 10 MB.', type: 'error' });
+        if (file.size > 50 * 1024 * 1024) {
+            setMessage({ text: 'Please upload below 50 MB.', type: 'error' });
             return;
         }
 
@@ -80,15 +82,23 @@ const FileUploadForm: React.FC<FileUploadFormProps> = ({ department }) => {
 
         setLoading(true);
         try {
-            await axios.post(API_URL, formData, {
+            const response = await axios.post(API_URL, formData, {
                 headers: { 'Content-Type': 'multipart/form-data' },
             });
-            setMessage({ text: 'Upload successful! Your classmates can now download it.', type: 'success' });
+
+            // Save the upload token to localStorage so the uploader can edit/delete later
+            if (response.data._id && response.data.uploadToken) {
+                const savedTokens = JSON.parse(localStorage.getItem('uploadTokens') || '{}');
+                savedTokens[response.data._id] = response.data.uploadToken;
+                localStorage.setItem('uploadTokens', JSON.stringify(savedTokens));
+            }
+
+            setMessage({ text: 'Upload successful! You can now edit or delete your uploaded file from the library if you made any mistakes.', type: 'success' });
             setFile(null);
             setTitle('');
             setSubject('');
             setChapter('');
-            setCourseYear('');
+            setCourseYear('2026');
             setUploaderName('');
             setFileType('');
             (document.getElementById('file-input') as HTMLInputElement).value = '';
@@ -166,7 +176,7 @@ const FileUploadForm: React.FC<FileUploadFormProps> = ({ department }) => {
 
             {/* File Input */}
             <motion.div variants={fieldVariant} custom={2}>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Select PDF File (Max 10 MB) </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select PDF File (Max 50 MB — auto-compressed if over 10 MB) </label>
                 <motion.input
                     id="file-input"
                     type="file"
@@ -280,19 +290,24 @@ const FileUploadForm: React.FC<FileUploadFormProps> = ({ department }) => {
                 }`}
             >
                 {loading ? (
-                    <motion.span
+                    <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         transition={{ duration: 0.3 }}
-                        className="flex items-center justify-center space-x-2"
+                        className="flex flex-col items-center justify-center space-y-1"
                     >
-                        <motion.span
-                            animate={{ scale: [1, 1.2, 1] }}
-                            transition={{ duration: 0.8, repeat: Infinity, ease: 'easeInOut' }}
-                            className="inline-block h-3 w-3 bg-white rounded-full"
-                        />
-                        <span>Please wait, file is uploading...</span>
-                    </motion.span>
+                        <div className="flex items-center space-x-3">
+                            <motion.span
+                                animate={{ rotate: 360 }}
+                                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                                className="inline-block h-5 w-5 border-2 border-white border-t-transparent rounded-full"
+                            />
+                            <span>Processing & Uploading...</span>
+                        </div>
+                        <span className="text-xs text-white/80 font-normal text-center px-2">
+                            Auto-compressing large files via iLovePDF. Please wait, this may take a moment.
+                        </span>
+                    </motion.div>
                 ) : (
                     'Upload & Share'
                 )}

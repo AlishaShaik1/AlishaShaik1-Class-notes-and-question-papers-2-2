@@ -20,9 +20,10 @@ const TEMP_DIR = path.join(__dirname, '..', '..', 'temp');
  * Runs AFTER multer, BEFORE uploadToSupabase.
  */
 const compressPdf = async (req, res, next) => {
-    if (!req.file || !req.file.buffer) return next();
+    if (!req.file || (!req.file.buffer && !req.file.path)) return next();
 
-    const originalSize = req.file.buffer.length;
+    const isDiskStorage = !!req.file.path;
+    const originalSize = isDiskStorage ? fs.statSync(req.file.path).size : req.file.buffer.length;
 
     if (originalSize <= SIZE_THRESHOLD) {
         console.log(`PDF size: ${(originalSize / (1024 * 1024)).toFixed(2)} MB — under 10 MB, skipping compression.`);
@@ -37,12 +38,13 @@ const compressPdf = async (req, res, next) => {
         fs.mkdirSync(TEMP_DIR, { recursive: true });
     }
 
-    const tempInputPath = path.join(TEMP_DIR, `input-${Date.now()}.pdf`);
-    const tempOutputPath = path.join(TEMP_DIR, `output-${Date.now()}.pdf`);
+    const tempInputPath = isDiskStorage ? req.file.path : path.join(TEMP_DIR, `input-${Date.now()}.pdf`);
 
     try {
-        // 1. Write buffer to temp file (iLovePDF SDK needs a file path)
-        fs.writeFileSync(tempInputPath, req.file.buffer);
+        // 1. If using memory storage, write buffer to temp file
+        if (!isDiskStorage) {
+            fs.writeFileSync(tempInputPath, req.file.buffer);
+        }
 
         // 2. Initialize iLovePDF API
         const instance = new ILovePDFApi(
@@ -74,8 +76,13 @@ const compressPdf = async (req, res, next) => {
 
         // Only use compressed version if it's actually smaller
         if (compressedSize < originalSize) {
-            req.file.buffer = Buffer.from(compressedData);
-            req.file.size = compressedSize;
+            if (isDiskStorage) {
+                fs.writeFileSync(req.file.path, Buffer.from(compressedData));
+                req.file.size = compressedSize;
+            } else {
+                req.file.buffer = Buffer.from(compressedData);
+                req.file.size = compressedSize;
+            }
         } else {
             console.log('Compressed file is not smaller. Using original.');
         }
@@ -87,9 +94,8 @@ const compressPdf = async (req, res, next) => {
         console.log('Proceeding with original file...');
         next();
     } finally {
-        // Clean up temp files
-        try { if (fs.existsSync(tempInputPath)) fs.unlinkSync(tempInputPath); } catch (_) {}
-        try { if (fs.existsSync(tempOutputPath)) fs.unlinkSync(tempOutputPath); } catch (_) {}
+        // Clean up temp file only if it was created specifically for memory storage fallback
+        try { if (!isDiskStorage && fs.existsSync(tempInputPath)) fs.unlinkSync(tempInputPath); } catch (_) {}
     }
 };
 

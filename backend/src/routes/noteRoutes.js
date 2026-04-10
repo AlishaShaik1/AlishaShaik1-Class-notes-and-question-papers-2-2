@@ -1,11 +1,30 @@
 // backend/src/routes/noteRoutes.js
 import express from 'express';
-import { uploadNote, getNotes, deleteNote } from '../controllers/noteController.js'; 
+import { uploadNote, getNotes, deleteNote, editNote } from '../controllers/noteController.js'; 
 import { multerUpload, uploadToSupabase } from '../middleware/upload.js'; 
 import compressPdf from '../middleware/compressPdf.js';
 import adminAuth from '../middleware/adminAuth.js';
 
+import jwt from 'jsonwebtoken';
+
 const router = express.Router();
+
+// Middleware: Try to authenticate as admin, but DON'T block if not admin
+const optionalAdminAuth = (req, res, next) => {
+    req.isAdmin = false;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        try {
+            const token = authHeader.split(' ')[1];
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            if (decoded.role === 'admin') {
+                req.isAdmin = true;
+                req.admin = decoded;
+            }
+        } catch {}
+    }
+    next();
+};
 
 // --- GET /api/notes — Fetch all notes (with optional ?department= filter) ---
 // --- POST /api/notes — Upload a new note (public) ---
@@ -35,8 +54,10 @@ router
         uploadNote
     );
 
-// --- DELETE /api/notes/:id — Delete a note (Admin only) ---
+// --- PUT /api/notes/:id — Edit note (Uploader via token or Admin via JWT) ---
+// --- DELETE /api/notes/:id — Delete a note (Uploader via token or Admin via JWT) ---
 router.route('/:id')
-    .delete(adminAuth, deleteNote); 
+    .put(optionalAdminAuth, editNote)
+    .delete(optionalAdminAuth, deleteNote); 
 
 export default router;

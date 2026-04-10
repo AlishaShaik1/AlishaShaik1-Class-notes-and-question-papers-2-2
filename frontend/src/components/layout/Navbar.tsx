@@ -21,6 +21,8 @@ const Navbar: React.FC = () => {
   const isHome = location.pathname === '/';
   const titleText = isHome ? 'PEC Notes Hub' : displayDept ? `${displayDept} 2-2 Notes & Papers` : 'PEC Notes Hub';
   const shortTitle = isHome ? 'PEC Notes Hub' : displayDept ? `${displayDept} 2-2 Notes` : 'PEC Notes Hub';
+  // Even shorter title for mobile when admin is logged in (extra buttons cause overlap)
+  const adminMobileTitle = isHome ? 'PEC Notes' : displayDept || 'PEC Notes';
 
   return (
     <>
@@ -33,10 +35,10 @@ const Navbar: React.FC = () => {
             </Link>
 
             {/* Center: Title */}
-            <div className={`absolute inset-0 flex items-center justify-center pointer-events-none ${isHome ? '' : 'pr-16'} md:pr-0`}>
-              {/* Mobile: short title */}
+            <div className={`absolute inset-0 flex items-center justify-center pointer-events-none ${isHome ? '' : isAdmin ? 'pr-36 sm:pr-40' : 'pr-20 sm:pr-24'} md:pr-0`}>
+              {/* Mobile: short title (even shorter when admin logged in to avoid overlap) */}
               <motion.span className={`md:hidden text-white font-extrabold tracking-wide uppercase drop-shadow-lg whitespace-nowrap pointer-events-auto ${isHome ? 'text-sm sm:text-base tracking-wider' : 'text-[11px] sm:text-xs'}`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
-                {shortTitle}
+                {isAdmin ? adminMobileTitle : shortTitle}
               </motion.span>
               {/* Desktop: full title */}
               <motion.span className="hidden md:block text-white font-extrabold tracking-wide uppercase drop-shadow-lg text-2xl lg:text-3xl whitespace-nowrap pointer-events-auto" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
