@@ -78,7 +78,7 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, onDelete, onEdit }) => {
       const headers: Record<string, string> = {};
       if (isAdmin) {
         const token = localStorage.getItem('adminToken');
-        headers['Authorization'] = `Bearer ${token}`;
+        if (token) headers['Authorization'] = `Bearer ${token}`;
       }
       if (uploadToken) {
         headers['x-upload-token'] = uploadToken;
@@ -101,13 +101,13 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, onDelete, onEdit }) => {
   };
 
   const handleSaveEdit = async () => {
-    if (!editTitle.trim()) return;
+    if (saving || !editTitle.trim()) return;
     setSaving(true);
     try {
       const headers: Record<string, string> = {};
       if (isAdmin) {
         const token = localStorage.getItem('adminToken');
-        headers['Authorization'] = `Bearer ${token}`;
+        if (token) headers['Authorization'] = `Bearer ${token}`;
       }
       if (uploadToken) {
         headers['x-upload-token'] = uploadToken;

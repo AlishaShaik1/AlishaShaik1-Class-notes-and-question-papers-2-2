@@ -167,7 +167,7 @@ const Library: React.FC = () => {
                         <NoteCard
                             note={note}
                             onDelete={(id) => setAllNotes(prev => prev.filter(n => n._id !== id))}
-                            onEdit={(id, updated) => setAllNotes(prev => prev.map(n => n._id === id ? { ...n, ...updated } : n))}
+                            onEdit={(id, updated) => setAllNotes(prev => prev.map(n => n._id === id ? { ...n, ...updated } as Note : n))}
                         />
                     </motion.div>
                 ))}
