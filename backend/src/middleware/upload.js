@@ -22,7 +22,7 @@ const upload = multer({
     storage: storage,
     fileFilter: pdfFilter,
     limits: {
-        fileSize: 1024 * 1024 * 11 // 11 MB limit
+        fileSize: 1024 * 1024 * 50 // 50 MB limit (compression middleware handles files > 10 MB)
     }
 });
 

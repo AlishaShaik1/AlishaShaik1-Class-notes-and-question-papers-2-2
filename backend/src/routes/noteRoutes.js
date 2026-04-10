@@ -2,6 +2,7 @@
 import express from 'express';
 import { uploadNote, getNotes, deleteNote } from '../controllers/noteController.js'; 
 import { multerUpload, uploadToSupabase } from '../middleware/upload.js'; 
+import compressPdf from '../middleware/compressPdf.js';
 import adminAuth from '../middleware/adminAuth.js';
 
 const router = express.Router();
@@ -26,9 +27,11 @@ router
                 next();
             });
         },
-        // Step 2: Upload the file buffer to Supabase Storage
+        // Step 2: Compress PDF if size > 10 MB
+        compressPdf,
+        // Step 3: Upload the file buffer to Supabase Storage
         uploadToSupabase,
-        // Step 3: Save the note metadata to MongoDB
+        // Step 4: Save the note metadata to MongoDB
         uploadNote
     );
 
