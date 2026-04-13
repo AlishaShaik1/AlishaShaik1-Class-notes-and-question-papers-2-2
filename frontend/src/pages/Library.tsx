@@ -41,9 +41,9 @@ const Library: React.FC = () => {
 
     // Department-specific subjects
     const SUBJECTS_MAP: Record<string, string[]> = {
-        AIML: ['M4', 'DLCO', 'ML', 'DBMS', 'OT', 'DTI'],
-        CSE:  ['M4', 'MEFA', 'OS', 'DBMS', 'SE', 'DTI'],
-        DS:   ['SMDS', 'COA', 'DE', 'DBMS', 'OT', 'DTI'],
+        AIML: ['M4', 'DLCO', 'ML', 'DBMS', 'OT'],
+        CSE:  ['M4', 'MEFA', 'OS', 'DBMS', 'SE'],
+        DS:   ['SMDS', 'COA', 'DE', 'DBMS', 'OT'],
     };
     const SUBJECTS = SUBJECTS_MAP[deptName] || SUBJECTS_MAP['AIML'];
 
