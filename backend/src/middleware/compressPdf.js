@@ -7,6 +7,7 @@ import ILovePDFFile from '@ilovepdf/ilovepdf-nodejs/ILovePDFFile.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -68,7 +69,7 @@ const compressPdf = async (req, res, next) => {
         fs.mkdirSync(TEMP_DIR, { recursive: true });
     }
 
-    const tempInputPath = isDiskStorage ? req.file.path : path.join(TEMP_DIR, `input-${Date.now()}.pdf`);
+    const tempInputPath = isDiskStorage ? req.file.path : path.join(TEMP_DIR, `input-${crypto.randomUUID()}.pdf`);
 
     try {
         // If using memory storage, write buffer to temp file
@@ -117,10 +118,9 @@ const compressPdf = async (req, res, next) => {
         next();
 
     } catch (err) {
-        console.error('iLovePDF compression failed:', err.message);
+        console.error('iLovePDF compression failed:', err);
         return res.status(500).json({
             message: 'PDF compression failed. Please try uploading a smaller file (under 10 MB).',
-            detail: err.message,
         });
     } finally {
         // Clean up temp file only if it was created for memory storage

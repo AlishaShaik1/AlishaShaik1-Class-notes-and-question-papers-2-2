@@ -99,8 +99,9 @@ const FileUploadForm: React.FC<FileUploadFormProps> = ({ department, defaultFile
                 if (isMultiUpload) {
                     // Extract title and chapter from filename
                     const baseName = file.name.replace(/\.pdf$/i, '');
-                    const chapterMatch = baseName.match(/\d+/);
-                    const parsedChapter = chapterMatch ? chapterMatch[0] : '0';
+                    const semanticMatch = baseName.match(/(?:chapter|ch|module|mod)[-_ ]?(\d+)/i);
+                    const lastNumberMatch = baseName.match(/(\d+)(?!.*\d)/);
+                    const parsedChapter = semanticMatch ? semanticMatch[1] : (lastNumberMatch ? lastNumberMatch[1] : '0');
                     
                     formData.append('title', baseName);
                     formData.append('chapter', requiresChapter ? parsedChapter : '0');
@@ -112,6 +113,7 @@ const FileUploadForm: React.FC<FileUploadFormProps> = ({ department, defaultFile
                 try {
                     const response = await axios.post(API_URL, formData, {
                         headers: { 'Content-Type': 'multipart/form-data' },
+                        timeout: 30000,
                     });
 
                     if (response.data._id && response.data.uploadToken) {
@@ -226,10 +228,11 @@ const FileUploadForm: React.FC<FileUploadFormProps> = ({ department, defaultFile
                     onChange={(e) => {
                         const selectedFiles = Array.from(e.target.files || []);
                         if (selectedFiles.length > 5) {
-                            alert("You can only select up to 5 files.");
+                            setMessage({ text: 'You can only select up to 5 files.', type: 'error' });
                             e.target.value = '';
                             setFiles([]);
                         } else {
+                            setMessage({ text: '', type: '' });
                             setFiles(selectedFiles);
                         }
                     }}

@@ -50,11 +50,14 @@ export const uploadToCloudinary = async (req, res, next) => {
         const filePath = req.file.path;
         console.log(`Uploading to Cloudinary: ${req.file.originalname}`);
 
+        const lastDotIdx = req.file.originalname.lastIndexOf('.');
+        const baseName = lastDotIdx === -1 ? req.file.originalname : req.file.originalname.slice(0, lastDotIdx);
+
         // Upload as 'raw' resource type for PDFs (not image/video)
         const result = await cloudinary.uploader.upload(filePath, {
             resource_type: 'raw',
             folder: 'pec-notes',
-            public_id: `${req.file.originalname.split('.')[0].replace(/[^a-zA-Z0-9_-]/g, '_')}-${Date.now()}`,
+            public_id: `${baseName.replace(/[^a-zA-Z0-9_-]/g, '_')}-${Date.now()}`,
             overwrite: false,
         });
 
@@ -66,10 +69,9 @@ export const uploadToCloudinary = async (req, res, next) => {
         next();
 
     } catch (err) {
-        console.error('Cloudinary upload exception:', err.message);
+        console.error('Cloudinary upload exception:', err);
         return res.status(500).json({
             message: 'Upload failed: Server error during file processing.',
-            detail: err.message,
         });
     } finally {
         // Clean up temp file

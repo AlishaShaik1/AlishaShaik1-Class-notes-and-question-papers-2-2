@@ -54,6 +54,10 @@ export const uploadNote = async (req, res) => {
 
     // Get the Cloudinary URL from the upload middleware
     const fileUrl = req.file.cloudinaryUrl;
+    if (!fileUrl) {
+        console.log('File upload failed or missing cloudinaryUrl. req.file:', req.file);
+        return res.status(400).json({ message: 'File upload failed or missing cloudinaryUrl' });
+    }
     const filePath = req.file.cloudinaryPublicId || '';
 
     // Validate required fields
