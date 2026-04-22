@@ -1,8 +1,8 @@
 // backend/src/middleware/upload.js
-// Supabase-based file upload middleware (replaces Cloudinary)
+// Cloudinary-based file upload middleware
 
 import multer from 'multer';
-import supabase, { BUCKET_NAME } from '../config/supabase.js';
+import cloudinary from '../config/cloudinary.js';
 import fs from 'fs';
 import os from 'os';
 
@@ -27,70 +27,52 @@ const pdfFilter = (req, file, cb) => {
     }
 };
 
-// 3. Configure Multer with memory storage
+// 3. Configure Multer with disk storage
 const upload = multer({
     storage: storage,
     fileFilter: pdfFilter,
     limits: {
-        fileSize: 1024 * 1024 * 50 // 50 MB total upload limit (compression middleware explicitly handles files > 10 MB)
+        fileSize: 1024 * 1024 * 100 // 100 MB upload limit (iLovePDF will compress files > 10 MB before Cloudinary upload)
     }
 });
 
 // 4. Multer middleware to accept single file
 export const multerUpload = upload.single('pdfFile');
 
-// 5. Supabase upload middleware — runs AFTER multer parses the file
-export const uploadToSupabase = async (req, res, next) => {
+// 5. Cloudinary upload middleware — runs AFTER multer parses the file
+export const uploadToCloudinary = async (req, res, next) => {
     // If no file was parsed by multer, skip
     if (!req.file) {
         return next();
     }
 
     try {
-        const fileExtension = req.file.originalname.split('.').pop();
-        const baseName = req.file.originalname.split('.')[0].replace(/[^a-zA-Z0-9_-]/g, '_');
-        const filePath = `uploads/${baseName}-${Date.now()}.${fileExtension}`;
+        const filePath = req.file.path;
+        console.log(`Uploading to Cloudinary: ${req.file.originalname}`);
 
-        console.log(`Uploading to Supabase: ${filePath}`);
+        // Upload as 'raw' resource type for PDFs (not image/video)
+        const result = await cloudinary.uploader.upload(filePath, {
+            resource_type: 'raw',
+            folder: 'pec-notes',
+            public_id: `${req.file.originalname.split('.')[0].replace(/[^a-zA-Z0-9_-]/g, '_')}-${Date.now()}`,
+            overwrite: false,
+        });
 
-        const fileData = fs.readFileSync(req.file.path);
+        // Attach the URL and public_id to the request for the controller
+        req.file.cloudinaryUrl = result.secure_url;
+        req.file.cloudinaryPublicId = result.public_id;
 
-        const { data, error } = await supabase
-            .storage
-            .from(BUCKET_NAME)
-            .upload(filePath, fileData, {
-                contentType: req.file.mimetype,
-                upsert: false,
-            });
-
-        if (error) {
-            console.error('Supabase upload error:', error.message);
-            return res.status(500).json({
-                message: 'Upload failed: Supabase storage error.',
-                detail: error.message,
-            });
-        }
-
-        // Get the public URL for the uploaded file
-        const { data: publicUrlData } = supabase
-            .storage
-            .from(BUCKET_NAME)
-            .getPublicUrl(filePath);
-
-        // Attach the URL and path to the request for the controller
-        req.file.supabaseUrl = publicUrlData.publicUrl;
-        req.file.supabasePath = filePath;
-
-        console.log('Supabase upload successful:', publicUrlData.publicUrl);
+        console.log('Cloudinary upload successful:', result.secure_url);
         next();
 
     } catch (err) {
-        console.error('Supabase upload exception:', err.message);
+        console.error('Cloudinary upload exception:', err.message);
         return res.status(500).json({
             message: 'Upload failed: Server error during file processing.',
             detail: err.message,
         });
     } finally {
+        // Clean up temp file
         if (req.file && req.file.path && fs.existsSync(req.file.path)) {
             try {
                 fs.unlinkSync(req.file.path);

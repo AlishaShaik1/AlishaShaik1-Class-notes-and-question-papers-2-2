@@ -1,7 +1,7 @@
 // frontend/src/components/notes/NoteCard.tsx
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Download, Eye, Trash2, Pencil, Check, X } from "lucide-react";
+import { Eye, Trash2, Pencil, Check, X } from "lucide-react";
 import { useAdmin } from "../../contexts/AdminContext";
 import axios from "axios";
 
@@ -50,25 +50,11 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, onDelete, onEdit }) => {
       year: "numeric", month: "short", day: "numeric",
     });
 
-  const handleDownload = async () => {
-    try {
-      window.open(note.fileUrl, "_blank");
-      const response = await fetch(note.fileUrl);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = note.title?.replace(/\s+/g, "_") + ".pdf";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error("Error downloading file:", err);
-    }
-  };
+  // Download button removed to save Cloudinary bandwidth credits.
 
   const handleView = () => {
+    // Open the PDF directly from Cloudinary.
+    // Bandwidth is minimal since: download button is removed, and Cloudinary CDN caches files.
     window.open(note.fileUrl, "_blank");
   };
 
@@ -244,12 +230,9 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, onDelete, onEdit }) => {
             <p><span className="font-semibold text-gray-900">Uploaded On:</span> {formatDate(note.createdAt)}</p>
           </div>
         </div>
-        <div className="flex justify-between gap-3 mt-4">
-          <motion.button onClick={handleView} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="w-1/2 flex items-center justify-center gap-2 py-3 bg-indigo-500 text-white font-bold rounded-xl shadow-md hover:bg-indigo-600 transition-all duration-300">
+        <div className="flex justify-center mt-4">
+          <motion.button onClick={handleView} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-indigo-500 to-blue-500 text-white font-bold rounded-xl shadow-md hover:from-indigo-600 hover:to-blue-600 transition-all duration-300">
             <Eye className="w-5 h-5" /> View PDF
-          </motion.button>
-          <motion.button onClick={handleDownload} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="w-1/2 flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-green-500 to-blue-500 text-white font-bold rounded-xl shadow-md hover:from-green-600 hover:to-blue-600 transition-all duration-300">
-            <Download className="w-5 h-5" /> Download
           </motion.button>
         </div>
       </div>

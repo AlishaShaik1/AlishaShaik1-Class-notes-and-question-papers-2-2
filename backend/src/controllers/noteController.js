@@ -2,7 +2,7 @@
 
 import crypto from 'crypto';
 import Note from '../models/Note.js';
-import supabase, { BUCKET_NAME } from '../config/supabase.js';
+import cloudinary from '../config/cloudinary.js';
 
 // Generate a random token and its hash
 const generateToken = () => {
@@ -52,9 +52,9 @@ export const uploadNote = async (req, res) => {
     const yearNum = parseInt(courseYear, 10);
     const finalSubject = subject || 'N/A';
 
-    // Get the Supabase URL from the upload middleware
-    const fileUrl = req.file.supabaseUrl;
-    const filePath = req.file.supabasePath || '';
+    // Get the Cloudinary URL from the upload middleware
+    const fileUrl = req.file.cloudinaryUrl;
+    const filePath = req.file.cloudinaryPublicId || '';
 
     // Validate required fields
     const validDepartments = ['AIML', 'CSE', 'DS', 'AI'];
@@ -172,7 +172,7 @@ export const editNote = async (req, res) => {
 };
 
 // -----------------------------------------------------------------------
-// @desc    Delete a note by ID (also removes file from Supabase)
+// @desc    Delete a note by ID (also removes file from Cloudinary)
 // @route   DELETE /api/notes/:id
 // @access  Uploader (via token) or Admin (via JWT)
 export const deleteNote = async (req, res) => {
@@ -191,21 +191,20 @@ export const deleteNote = async (req, res) => {
             return res.status(403).json({ message: 'You are not authorized to delete this note.' });
         }
 
-        // Delete from Supabase storage if path exists
+        // Delete from Cloudinary storage if public_id exists
         if (note.filePath) {
             try {
-                const { error: storageError } = await supabase
-                    .storage
-                    .from(BUCKET_NAME)
-                    .remove([note.filePath]);
+                const result = await cloudinary.uploader.destroy(note.filePath, {
+                    resource_type: 'raw',
+                });
 
-                if (storageError) {
-                    console.warn('Supabase file deletion warning:', storageError.message);
+                if (result.result === 'ok') {
+                    console.log('Cloudinary file deleted:', note.filePath);
                 } else {
-                    console.log('Supabase file deleted:', note.filePath);
+                    console.warn('Cloudinary file deletion warning:', result.result);
                 }
             } catch (storageErr) {
-                console.warn('Supabase deletion exception (continuing):', storageErr.message);
+                console.warn('Cloudinary deletion exception (continuing):', storageErr.message);
             }
         }
 

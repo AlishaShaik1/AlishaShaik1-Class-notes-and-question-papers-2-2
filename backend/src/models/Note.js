@@ -27,7 +27,7 @@ const noteSchema = mongoose.Schema(
             type: String,
             required: true,
         },
-        // Path in Supabase storage (used for deletion)
+        // Cloudinary public_id (used for deletion)
         filePath: {
             type: String,
             default: '',

@@ -13,7 +13,7 @@ interface FileUploadFormProps {
 }
 
 const FileUploadForm: React.FC<FileUploadFormProps> = ({ department, defaultFileType = '', defaultSubject = '' }) => {
-    const [file, setFile] = useState<File | null>(null);
+    const [files, setFiles] = useState<File[]>([]);
     const [title, setTitle] = useState('');
     const [subject, setSubject] = useState(defaultSubject);
     const [chapter, setChapter] = useState('');
@@ -22,6 +22,7 @@ const FileUploadForm: React.FC<FileUploadFormProps> = ({ department, defaultFile
     const [fileType, setFileType] = useState(defaultFileType);
     const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' | '' }>({ text: '', type: '' });
     const [loading, setLoading] = useState(false);
+    const [progressText, setProgressText] = useState('');
 
     // Department-specific subjects
     const SUBJECTS_MAP: Record<string, string[]> = {
@@ -34,79 +35,119 @@ const FileUploadForm: React.FC<FileUploadFormProps> = ({ department, defaultFile
 
     const requiresSubject = fileType === 'Notes' || fileType === 'Assignments';
     const requiresChapter = fileType === 'Notes';
+    const isMultiUpload = files.length > 1;
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setMessage({ text: '', type: '' });
 
-        if (requiresChapter && (!subject || !chapter)) {
+        if (files.length === 0) {
+            setMessage({ text: 'Please select at least one file.', type: 'error' });
+            return;
+        }
+        if (files.length > 5) {
+            setMessage({ text: 'You can only upload a maximum of 5 files at a time.', type: 'error' });
+            return;
+        }
+
+        if (requiresSubject && !subject) {
+            setMessage({ text: 'Please select a Subject.', type: 'error' });
+            return;
+        }
+        if (!isMultiUpload && requiresChapter && (!subject || !chapter)) {
             setMessage({ text: 'Please select both Subject and Chapter for Class Notes.', type: 'error' });
             return;
         }
-        if (fileType === 'Assignments' && !subject) {
-            setMessage({ text: 'Assignments require a Subject selection.', type: 'error' });
+        if (!isMultiUpload && !title) {
+            setMessage({ text: 'Please provide a title.', type: 'error' });
             return;
         }
-        if (!file || !title || !courseYear || !uploaderName || !fileType) {
-            setMessage({ text: 'Please fill out all required fields and select a file.', type: 'error' });
-            return;
-        }
-        if (file.type !== 'application/pdf') {
-            setMessage({ text: 'Only PDF files are allowed.', type: 'error' });
-            return;
-        }
-        if (file.size > 50 * 1024 * 1024) {
-            setMessage({ text: 'Please upload below 50 MB.', type: 'error' });
+        if (!courseYear || !uploaderName || !fileType) {
+            setMessage({ text: 'Please fill out all required fields.', type: 'error' });
             return;
         }
 
-        const formData = new FormData();
-        formData.append('pdfFile', file);
-        formData.append('title', title);
-        formData.append('courseYear', courseYear);
-        formData.append('uploaderName', uploaderName);
-        formData.append('fileType', fileType);
-        formData.append('department', department); // Include department
-
-        if (requiresSubject) {
-            formData.append('subject', subject);
-        } else {
-            formData.append('subject', 'N/A');
-        }
-
-        if (requiresChapter) {
-            formData.append('chapter', chapter);
-        } else {
-            formData.append('chapter', '0');
+        // Validate all files
+        for (const file of files) {
+            if (file.type !== 'application/pdf') {
+                setMessage({ text: `Only PDF files are allowed. (${file.name} is invalid)`, type: 'error' });
+                return;
+            }
+            if (file.size > 100 * 1024 * 1024) {
+                setMessage({ text: `File size limit exceeded. (${file.name} is over 100MB)`, type: 'error' });
+                return;
+            }
         }
 
         setLoading(true);
-        try {
-            const response = await axios.post(API_URL, formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
-            });
+        let successCount = 0;
+        let failCount = 0;
 
-            // Save the upload token to localStorage so the uploader can edit/delete later
-            if (response.data._id && response.data.uploadToken) {
-                const savedTokens = JSON.parse(localStorage.getItem('uploadTokens') || '{}');
-                savedTokens[response.data._id] = response.data.uploadToken;
-                localStorage.setItem('uploadTokens', JSON.stringify(savedTokens));
+        try {
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                setProgressText(`Uploading ${i + 1} of ${files.length}: ${file.name}...`);
+                
+                const formData = new FormData();
+                formData.append('pdfFile', file);
+                formData.append('courseYear', courseYear);
+                formData.append('uploaderName', uploaderName);
+                formData.append('fileType', fileType);
+                formData.append('department', department);
+                formData.append('subject', requiresSubject ? subject : 'N/A');
+
+                if (isMultiUpload) {
+                    // Extract title and chapter from filename
+                    const baseName = file.name.replace(/\.pdf$/i, '');
+                    const chapterMatch = baseName.match(/\d+/);
+                    const parsedChapter = chapterMatch ? chapterMatch[0] : '0';
+                    
+                    formData.append('title', baseName);
+                    formData.append('chapter', requiresChapter ? parsedChapter : '0');
+                } else {
+                    formData.append('title', title);
+                    formData.append('chapter', requiresChapter ? chapter : '0');
+                }
+
+                try {
+                    const response = await axios.post(API_URL, formData, {
+                        headers: { 'Content-Type': 'multipart/form-data' },
+                    });
+
+                    if (response.data._id && response.data.uploadToken) {
+                        const savedTokens = JSON.parse(localStorage.getItem('uploadTokens') || '{}');
+                        savedTokens[response.data._id] = response.data.uploadToken;
+                        localStorage.setItem('uploadTokens', JSON.stringify(savedTokens));
+                    }
+                    successCount++;
+                } catch (err) {
+                    console.error(`Failed to upload ${file.name}`, err);
+                    failCount++;
+                }
             }
 
-            setMessage({ text: 'Upload successful! You can now edit or delete your uploaded file from the library if you made any mistakes.', type: 'success' });
-            setFile(null);
-            setTitle('');
-            setSubject('');
-            setChapter('');
-            setCourseYear('2026');
-            setUploaderName('');
-            setFileType('');
-            (document.getElementById('file-input') as HTMLInputElement).value = '';
+            if (failCount === 0) {
+                setMessage({ text: `Successfully uploaded ${successCount} file(s)!`, type: 'success' });
+                setFiles([]);
+                setTitle('');
+                setSubject('');
+                setChapter('');
+                setCourseYear('2026');
+                setUploaderName('');
+                setFileType('');
+                const fileInput = document.getElementById('file-input') as HTMLInputElement;
+                if (fileInput) fileInput.value = '';
+            } else if (successCount > 0) {
+                setMessage({ text: `Uploaded ${successCount} file(s), but ${failCount} failed. Check console.`, type: 'error' });
+            } else {
+                setMessage({ text: 'Upload failed for all files.', type: 'error' });
+            }
         } catch (error) {
             console.error(error);
-            setMessage({ text: 'Upload failed. Check backend status and console.', type: 'error' });
+            setMessage({ text: 'A critical error occurred during upload.', type: 'error' });
         } finally {
             setLoading(false);
+            setProgressText('');
         }
     };
 
@@ -176,12 +217,22 @@ const FileUploadForm: React.FC<FileUploadFormProps> = ({ department, defaultFile
 
             {/* File Input */}
             <motion.div variants={fieldVariant} custom={2}>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Select PDF File (Max 50 MB — auto-compressed if over 10 MB) </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Select PDF File(s) (Max 5 files, 100MB each) </label>
                 <motion.input
                     id="file-input"
                     type="file"
                     accept=".pdf"
-                    onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
+                    multiple
+                    onChange={(e) => {
+                        const selectedFiles = Array.from(e.target.files || []);
+                        if (selectedFiles.length > 5) {
+                            alert("You can only select up to 5 files.");
+                            e.target.value = '';
+                            setFiles([]);
+                        } else {
+                            setFiles(selectedFiles);
+                        }
+                    }}
                     whileHover={{ scale: 1.02 }}
                     className="w-full p-3 border border-gray-300 rounded-lg text-sm text-gray-600 
                     file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 
@@ -189,19 +240,26 @@ const FileUploadForm: React.FC<FileUploadFormProps> = ({ department, defaultFile
                     hover:file:bg-pec-blue/20"
                     required
                 />
+                {isMultiUpload && (
+                    <p className="mt-2 text-xs text-blue-600 font-semibold">
+                        Multiple files selected. Title and Chapter will be extracted from the filenames.
+                    </p>
+                )}
             </motion.div>
 
-            {/* Title */}
-            <motion.input
-                variants={fieldVariant}
-                custom={3}
-                type="text"
-                placeholder={requiresChapter ? 'Title (e.g., Module 3 Handout)' : 'Title (e.g., Midterm Exam 2024)'}
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-pec-blue focus:border-pec-blue transition"
-                required
-            />
+            {/* Title (Hidden if multi-upload) */}
+            {!isMultiUpload && (
+                <motion.input
+                    variants={fieldVariant}
+                    custom={3}
+                    type="text"
+                    placeholder={requiresChapter ? 'Title (e.g., Module 3 Handout)' : 'Title (e.g., Midterm Exam 2024)'}
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-pec-blue focus:border-pec-blue transition"
+                    required
+                />
+            )}
 
             {/* Subject and Chapter */}
             <AnimatePresence initial={false}>
@@ -231,8 +289,8 @@ const FileUploadForm: React.FC<FileUploadFormProps> = ({ department, defaultFile
                             </motion.select>
                         </motion.div>
 
-                        {/* Chapter (Notes Only) */}
-                        {requiresChapter && (
+                        {/* Chapter (Notes Only) - Hidden if multi-upload */}
+                        {!isMultiUpload && requiresChapter && (
                             <motion.div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Chapter:</label>
                                 <motion.select
@@ -302,14 +360,14 @@ const FileUploadForm: React.FC<FileUploadFormProps> = ({ department, defaultFile
                                 transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                                 className="inline-block h-5 w-5 border-2 border-white border-t-transparent rounded-full"
                             />
-                            <span>Processing & Uploading...</span>
+                            <span>{progressText || 'Processing & Uploading...'}</span>
                         </div>
                         <span className="text-xs text-white/80 font-normal text-center px-2">
                             Auto-compressing large files via iLovePDF. Please wait, this may take a moment.
                         </span>
                     </motion.div>
                 ) : (
-                    'Upload & Share'
+                    files.length > 1 ? `Upload ${files.length} Files` : 'Upload & Share'
                 )}
             </motion.button>
         </motion.form>
@@ -317,3 +375,4 @@ const FileUploadForm: React.FC<FileUploadFormProps> = ({ department, defaultFile
 };
 
 export default FileUploadForm;
+

@@ -1,7 +1,7 @@
 // backend/src/routes/noteRoutes.js
 import express from 'express';
 import { uploadNote, getNotes, deleteNote, editNote } from '../controllers/noteController.js'; 
-import { multerUpload, uploadToSupabase } from '../middleware/upload.js'; 
+import { multerUpload, uploadToCloudinary } from '../middleware/upload.js'; 
 import compressPdf from '../middleware/compressPdf.js';
 import adminAuth from '../middleware/adminAuth.js';
 
@@ -32,7 +32,7 @@ router
     .route('/')
     .get(getNotes)
     .post(
-        // Step 1: Multer parses the multipart form and loads file into memory
+        // Step 1: Multer parses the multipart form and loads file to disk
         (req, res, next) => {
             multerUpload(req, res, function (err) {
                 if (err) {
@@ -48,8 +48,8 @@ router
         },
         // Step 2: Compress PDF if size > 10 MB
         compressPdf,
-        // Step 3: Upload the file buffer to Supabase Storage
-        uploadToSupabase,
+        // Step 3: Upload the file to Cloudinary Storage
+        uploadToCloudinary,
         // Step 4: Save the note metadata to MongoDB
         uploadNote
     );
