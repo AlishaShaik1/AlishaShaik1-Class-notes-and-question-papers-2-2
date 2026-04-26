@@ -275,20 +275,23 @@ const AdminAnalytics: React.FC = () => {
                                         </td>
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-1 flex-wrap">
-                                                <motion.button
+                                                <motion.a
                                                     whileHover={{ scale: 1.1 }}
                                                     whileTap={{ scale: 0.9 }}
-                                                    onClick={() => window.open(note.fileUrl, '_blank')}
+                                                    href={note.fileUrl?.replace('http://', 'https://')}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
                                                     className="p-1.5 bg-indigo-100 text-indigo-600 rounded-lg hover:bg-indigo-200 transition"
                                                     title="View PDF"
                                                 >
                                                     <Eye className="w-4 h-4" />
-                                                </motion.button>
+                                                </motion.a>
                                                 <motion.a
                                                     whileHover={{ scale: 1.1 }}
                                                     whileTap={{ scale: 0.9 }}
-                                                    href={note.fileUrl}
+                                                    href={note.fileUrl?.replace('http://', 'https://')}
                                                     target="_blank"
+                                                    rel="noopener noreferrer"
                                                     className="p-1.5 bg-green-100 text-green-600 rounded-lg hover:bg-green-200 transition"
                                                     title="Download"
                                                 >

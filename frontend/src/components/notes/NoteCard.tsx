@@ -52,12 +52,6 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, onDelete, onEdit }) => {
 
   // Download button removed to save Cloudinary bandwidth credits.
 
-  const handleView = () => {
-    // Open the PDF directly from Cloudinary.
-    // Bandwidth is minimal since: download button is removed, and Cloudinary CDN caches files.
-    window.open(note.fileUrl, "_blank");
-  };
-
   const handleDelete = async () => {
     if (!window.confirm(`Delete "${note.title}"? This cannot be undone.`)) return;
     try {
@@ -231,9 +225,9 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, onDelete, onEdit }) => {
           </div>
         </div>
         <div className="flex justify-center mt-4">
-          <motion.button onClick={handleView} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-indigo-500 to-blue-500 text-white font-bold rounded-xl shadow-md hover:from-indigo-600 hover:to-blue-600 transition-all duration-300">
+          <motion.a href={note.fileUrl?.replace('http://', 'https://')} target="_blank" rel="noopener noreferrer" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-indigo-500 to-blue-500 text-white font-bold rounded-xl shadow-md hover:from-indigo-600 hover:to-blue-600 transition-all duration-300">
             <Eye className="w-5 h-5" /> View PDF
-          </motion.button>
+          </motion.a>
         </div>
       </div>
     </motion.div>
