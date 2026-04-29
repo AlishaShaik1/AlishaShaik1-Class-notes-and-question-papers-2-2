@@ -113,7 +113,7 @@ const FileUploadForm: React.FC<FileUploadFormProps> = ({ department, defaultFile
                 try {
                     const response = await axios.post(API_URL, formData, {
                         headers: { 'Content-Type': 'multipart/form-data' },
-                        timeout: 30000,
+                        timeout: 180000, // 3 minutes — iLovePDF compression + Cloudinary upload can be slow on hosted servers
                     });
 
                     if (response.data._id && response.data.uploadToken) {
@@ -122,8 +122,19 @@ const FileUploadForm: React.FC<FileUploadFormProps> = ({ department, defaultFile
                         localStorage.setItem('uploadTokens', JSON.stringify(savedTokens));
                     }
                     successCount++;
-                } catch (err) {
-                    console.error(`Failed to upload ${file.name}`, err);
+                } catch (err: unknown) {
+                    let reason = 'Unknown error';
+                    if (axios.isAxiosError(err)) {
+                        if (err.code === 'ECONNABORTED') {
+                            reason = 'Request timed out — the server is taking too long (likely compressing a large PDF). Try a smaller file.';
+                        } else if (err.response?.data?.message) {
+                            reason = err.response.data.message;
+                        } else if (err.message) {
+                            reason = err.message;
+                        }
+                    }
+                    console.error(`Failed to upload ${file.name}: ${reason}`, err);
+                    setMessage({ text: `Failed to upload "${file.name}": ${reason}`, type: 'error' });
                     failCount++;
                 }
             }

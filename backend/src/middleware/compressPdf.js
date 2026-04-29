@@ -4,18 +4,15 @@
 
 import ILovePDFApi from '@ilovepdf/ilovepdf-nodejs';
 import ILovePDFFile from '@ilovepdf/ilovepdf-nodejs/ILovePDFFile.js';
+import os from 'os';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import crypto from 'crypto';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const CLOUDINARY_MAX = 10 * 1024 * 1024; // 10 MB — Cloudinary free plan limit for raw files
 
-// Temp directory for iLovePDF (needs file on disk)
-const TEMP_DIR = path.join(__dirname, '..', '..', 'temp');
+// Use OS temp dir — guaranteed writable on all hosting platforms (Render, Railway, etc.)
+const TEMP_DIR = os.tmpdir();
 
 /**
  * Compress a PDF using iLovePDF at the given compression level.
@@ -42,34 +39,35 @@ async function compressWithILovePDF(inputPath, level) {
 /**
  * Middleware: Compress PDF using iLovePDF API if file > 10 MB.
  * Runs AFTER multer, BEFORE uploadToCloudinary.
- * 
+ *
  * Logic:
  *   - ≤ 10 MB  → skip, upload directly to Cloudinary
  *   - > 10 MB  → try 'recommended' compression first
  *                 if still > 10 MB → try 'extreme' compression
- *                 if still > 10 MB → reject the upload
+ *                 if iLovePDF fails (quota, network, etc.) → WARN and fall through
+ *                   (Cloudinary will reject if still > 10 MB, but small files pass)
+ *                 if still > 10 MB after compression → reject with clear message
  */
 const compressPdf = async (req, res, next) => {
     if (!req.file || (!req.file.buffer && !req.file.path)) return next();
 
     const isDiskStorage = !!req.file.path;
     const originalSize = isDiskStorage ? fs.statSync(req.file.path).size : req.file.buffer.length;
+    const originalSizeMB = (originalSize / (1024 * 1024)).toFixed(2);
 
     // Under 10 MB — no compression needed, go straight to Cloudinary
     if (originalSize <= CLOUDINARY_MAX) {
-        console.log(`PDF size: ${(originalSize / (1024 * 1024)).toFixed(2)} MB — under 10 MB, uploading directly.`);
+        console.log(`PDF size: ${originalSizeMB} MB — under 10 MB, uploading directly.`);
         return next();
     }
 
-    console.log(`PDF size: ${(originalSize / (1024 * 1024)).toFixed(2)} MB — exceeds 10 MB Cloudinary limit, compressing...`);
+    console.log(`PDF size: ${originalSizeMB} MB — exceeds 10 MB, attempting iLovePDF compression...`);
     const startTime = Date.now();
 
-    // Ensure temp directory exists
-    if (!fs.existsSync(TEMP_DIR)) {
-        fs.mkdirSync(TEMP_DIR, { recursive: true });
-    }
-
-    const tempInputPath = isDiskStorage ? req.file.path : path.join(TEMP_DIR, `input-${crypto.randomUUID()}.pdf`);
+    // os.tmpdir() is always writable — no need to create it
+    const tempInputPath = isDiskStorage
+        ? req.file.path
+        : path.join(TEMP_DIR, `input-${crypto.randomUUID()}.pdf`);
 
     try {
         // If using memory storage, write buffer to temp file
@@ -77,54 +75,71 @@ const compressPdf = async (req, res, next) => {
             fs.writeFileSync(tempInputPath, req.file.buffer);
         }
 
-        // --- ATTEMPT 1: 'recommended' compression ---
-        console.log('→ Attempt 1: Compressing with "recommended" level...');
-        let compressedBuffer = await compressWithILovePDF(tempInputPath, 'recommended');
-        let compressedSize = compressedBuffer.length;
-        let elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+        let compressedBuffer = null;
+        let compressedSize = originalSize;
+        let elapsed = '0';
 
-        console.log(`  Result: ${(originalSize / (1024 * 1024)).toFixed(2)} MB → ${(compressedSize / (1024 * 1024)).toFixed(2)} MB in ${elapsed}s`);
-
-        // --- ATTEMPT 2: If still > 10 MB, try 'extreme' compression ---
-        if (compressedSize > CLOUDINARY_MAX) {
-            console.log('→ Attempt 2: Still over 10 MB, retrying with "extreme" compression...');
-            compressedBuffer = await compressWithILovePDF(tempInputPath, 'extreme');
+        try {
+            // --- ATTEMPT 1: 'recommended' compression ---
+            console.log('→ Attempt 1: Compressing with "recommended" level...');
+            compressedBuffer = await compressWithILovePDF(tempInputPath, 'recommended');
             compressedSize = compressedBuffer.length;
             elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+            console.log(`  Result: ${originalSizeMB} MB → ${(compressedSize / (1024 * 1024)).toFixed(2)} MB in ${elapsed}s`);
 
-            console.log(`  Result: ${(originalSize / (1024 * 1024)).toFixed(2)} MB → ${(compressedSize / (1024 * 1024)).toFixed(2)} MB in ${elapsed}s`);
+            // --- ATTEMPT 2: If still > 10 MB, try 'extreme' compression ---
+            if (compressedSize > CLOUDINARY_MAX) {
+                console.log('→ Attempt 2: Still over 10 MB, retrying with "extreme" compression...');
+                compressedBuffer = await compressWithILovePDF(tempInputPath, 'extreme');
+                compressedSize = compressedBuffer.length;
+                elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+                console.log(`  Result: ${originalSizeMB} MB → ${(compressedSize / (1024 * 1024)).toFixed(2)} MB in ${elapsed}s`);
+            }
+
+        } catch (ilovepdfErr) {
+            // ⚠️ iLovePDF failed (quota exhausted, API down, network error, etc.)
+            // Log the reason clearly and fall back to original file.
+            const reason = ilovepdfErr?.message || String(ilovepdfErr);
+            console.warn(`⚠️  iLovePDF compression unavailable: ${reason}`);
+            console.warn(`⚠️  Falling back to original file (${originalSizeMB} MB). Upload will fail only if > 10 MB.`);
+            compressedBuffer = null; // signal: use original
+            compressedSize = originalSize;
         }
 
-        // --- FINAL CHECK: If still > 10 MB after extreme, reject ---
+        // --- FINAL SIZE CHECK ---
         if (compressedSize > CLOUDINARY_MAX) {
-            console.error(`✗ File still ${(compressedSize / (1024 * 1024)).toFixed(2)} MB after extreme compression. Cannot upload.`);
-            return res.status(400).json({
-                message: `File is too large even after compression (${(compressedSize / (1024 * 1024)).toFixed(1)} MB). Cloudinary free plan allows max 10 MB per file. Please try a smaller PDF.`,
-            });
+            const sizeMB = (compressedSize / (1024 * 1024)).toFixed(1);
+            const wasCompressed = compressedBuffer !== null;
+            const msg = wasCompressed
+                ? `File is too large even after compression (${sizeMB} MB). Max allowed is 10 MB. Please split or reduce the PDF.`
+                : `File is ${sizeMB} MB which exceeds the 10 MB limit, and compression is currently unavailable (API quota may be exhausted). Please upload a smaller PDF.`;
+
+            console.error(`✗ ${msg}`);
+            return res.status(400).json({ message: msg });
         }
 
-        // Success — write compressed file back
-        const reductionPercent = ((1 - compressedSize / originalSize) * 100).toFixed(1);
-        console.log(`✓ Compression successful! ${(originalSize / (1024 * 1024)).toFixed(2)} MB → ${(compressedSize / (1024 * 1024)).toFixed(2)} MB (${reductionPercent}% smaller) in ${elapsed}s`);
+        // --- SUCCESS: apply compressed data if we got it ---
+        if (compressedBuffer) {
+            const reductionPercent = ((1 - compressedSize / originalSize) * 100).toFixed(1);
+            console.log(`✓ Compression successful! ${originalSizeMB} MB → ${(compressedSize / (1024 * 1024)).toFixed(2)} MB (${reductionPercent}% smaller) in ${elapsed}s`);
 
-        if (isDiskStorage) {
-            fs.writeFileSync(req.file.path, compressedBuffer);
-            req.file.size = compressedSize;
-        } else {
-            req.file.buffer = compressedBuffer;
-            req.file.size = compressedSize;
+            if (isDiskStorage) {
+                fs.writeFileSync(req.file.path, compressedBuffer);
+                req.file.size = compressedSize;
+            } else {
+                req.file.buffer = compressedBuffer;
+                req.file.size = compressedSize;
+            }
         }
+        // else: original file is already on disk / in buffer — nothing to do
 
         next();
 
-    } catch (err) {
-        console.error('iLovePDF compression failed:', err);
-        return res.status(500).json({
-            message: 'PDF compression failed. Please try uploading a smaller file (under 10 MB).',
-        });
     } finally {
         // Clean up temp file only if it was created for memory storage
-        try { if (!isDiskStorage && fs.existsSync(tempInputPath)) fs.unlinkSync(tempInputPath); } catch (_) {}
+        try {
+            if (!isDiskStorage && fs.existsSync(tempInputPath)) fs.unlinkSync(tempInputPath);
+        } catch (_) {}
     }
 };
 

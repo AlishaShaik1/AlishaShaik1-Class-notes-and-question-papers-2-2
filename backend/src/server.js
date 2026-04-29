@@ -11,8 +11,25 @@ connectDB();
 
 const app = express();
 
-// Middleware
-app.use(cors());
+// CORS — allow localhost dev + any hosted frontend URL set via env
+const allowedOrigins = [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    process.env.FRONTEND_URL,         // e.g. https://your-app.vercel.app
+].filter(Boolean);
+
+app.use(cors({
+    origin: (origin, callback) => {
+        // Allow requests with no origin (mobile apps, Postman, curl)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        callback(new Error(`CORS: origin ${origin} not allowed`));
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Upload-Token'],
+    credentials: true,
+}));
+
 app.use(express.json());
 
 // Routes
